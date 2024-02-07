@@ -1,0 +1,44 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 32
+    defaultConfig {
+        applicationId "com.acer.test.paroyalty"
+
+        minSdkVersion 22
+        targetSdkVersion 32
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    sourceSets { main { assets.srcDirs = ['src/main/assets', 'src/main/assets/'] } }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'androidx.constraintlayout:constraintlayout:1.1.3'
+    implementation 'com.google.android.material:material:1.1.0'
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
+
+    implementation 'org.slf4j:slf4j-api:1.7.25'
+    implementation "androidx.work:work-runtime:2.5.0"
+    implementation "androidx.work:work-runtime-ktx:2.5.0"
+    implementation "androidx.work:work-rxjava2:2.5.0"
+    implementation "androidx.work:work-gcm:2.5.0"
+    androidTestImplementation "androidx.work:work-testing:2.5.0"
+    implementation "androidx.work:work-multiprocess:2.5.0"
+    implementation 'com.github.tony19:logback-android-core:1.1.1-6'
+    implementation('com.github.tony19:logback-android-classic:1.1.1-6') {
+        exclude group: 'com.google.android', module: 'android'
+    }
+
+}
