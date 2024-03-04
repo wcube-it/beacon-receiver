@@ -1,13 +1,14 @@
 package com.wcube.paroyalty.receiver
 
 import android.Manifest
+import android.app.Activity.RESULT_OK
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.content.Context
-import android.content.pm.PackageManager
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -15,12 +16,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import androidx.core.app.ActivityCompat
 import androidx.fragment.app.Fragment
+import pub.devrel.easypermissions.EasyPermissions
 
-class ScannerFragment : Fragment() {
+
+class ScannerFragment : Fragment(), EasyPermissions.PermissionCallbacks {
     private var TAG = "beacon-receiver"
-    private var UUID = "F7826DA6-4FA2-4E98-8024-BC5B71E0893E"
     private var btManager: BluetoothManager? = null
     private var btAdapter: BluetoothAdapter? = null
     private var btScanner: BluetoothLeScanner? = null
@@ -35,12 +36,9 @@ class ScannerFragment : Fragment() {
         Manifest.permission.ACCESS_COARSE_LOCATION
     )
 
-    // necessary permissions on Android >=12
-    private val ANDROID_12_BLE_PERMISSIONS = arrayOf(
-        Manifest.permission.BLUETOOTH_SCAN,
-        Manifest.permission.BLUETOOTH_CONNECT,
-        Manifest.permission.ACCESS_FINE_LOCATION
-    )
+    val BLUETOOTH_PERMISSIONS_S =
+        arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.ACCESS_FINE_LOCATION)
+
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -62,34 +60,43 @@ class ScannerFragment : Fragment() {
         return view
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        // EasyPermissions handles the request result.
+        Log.d(TAG, "result"+ grantResults)
+        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, this)
+    }
+
+    override fun onPermissionsGranted(requestCode: Int, perms: List<String>) {
+        // permission to scan granted, run bluetooth manager
+        Log.d(TAG, "@isPermissionGranted: run scan")
+        setUpBluetoothManager()
+    }
+
+    override fun onPermissionsDenied(requestCode: Int, perms: List<String>) {
+        // TODO: if request rejected
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        // permission to turn on bluetooth succesd, run scan
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == RESULT_OK && requestCode == 100) {
+            startBLEScan()
+        }
+    }
+
     private fun isPermissionGranted(context: Context): Boolean {
         Log.d(TAG, "@isPermissionGranted: checking bluetooth")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if ((ActivityCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.BLUETOOTH_CONNECT
-                ) != PackageManager.PERMISSION_GRANTED) ||
-                (ActivityCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.BLUETOOTH_SCAN
-                ) != PackageManager.PERMISSION_GRANTED)
-            ) {
+            if (!EasyPermissions.hasPermissions(context, *BLUETOOTH_PERMISSIONS_S)) {
                 Log.d(TAG, "@isPermissionGranted: requesting Bluetooth on Android >= 12")
-                requestPermissions(ANDROID_12_BLE_PERMISSIONS, 2)
+                EasyPermissions.requestPermissions(this, "message", 2, *BLUETOOTH_PERMISSIONS_S);
                 return false
             }
         } else {
-            if ((ActivityCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ) != PackageManager.PERMISSION_GRANTED
-            ) || (ActivityCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                ) != PackageManager.PERMISSION_GRANTED
-                        )) {
-                Log.d(TAG, "@isPermissionGranted: requesting Location on Android < 12")
-                requestPermissions(BLE_PERMISSIONS, 3)
+            if (!EasyPermissions.hasPermissions(context, *BLE_PERMISSIONS)) {
+                Log.d(TAG, "@isPermissionGranted: requesting Bluetooth on Android >= 12")
+                EasyPermissions.requestPermissions(this, "message", 2, *BLE_PERMISSIONS);
                 return false
             }
         }
@@ -101,6 +108,7 @@ class ScannerFragment : Fragment() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             val scanRecord = result?.scanRecord
             super.onScanResult(callbackType, result)
+            Log.d(TAG, "receiving result")
 
             if (scanRecord != null) {
                 val device = IBeacon(scanRecord?.bytes!!)
@@ -108,7 +116,7 @@ class ScannerFragment : Fragment() {
                 val major = device.getMajor()
                 val minor = device.getMinor()
 
-                if (uuid == UUID) {
+                if (minor == 100) {
                     uuidDisplay.setText("UUID: "+ uuid)
                     majorDisplay.setText("Major: "+ major)
                     minorDisplay.setText("Minor: "+ minor)
@@ -136,10 +144,15 @@ class ScannerFragment : Fragment() {
         btManager = activity?.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         btAdapter = btManager!!.adapter
         btScanner = btAdapter?.bluetoothLeScanner
-        if (btAdapter != null && btAdapter!!.isEnabled) {
-            Log.d(TAG, "Bluetooth adapter is enabled")
-            startBLEScan()
+        if (btAdapter != null ) {
+            if (btAdapter?.isEnabled == false) {
+                Log.d(TAG, "Bluetooth adapter is not enabled")
+                val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                startActivityForResult(enableBtIntent, 100)
+            } else {
+                Log.d(TAG, "Bluetooth adapter is enabled")
+                startBLEScan()
+            }
         }
     }
-
 }
